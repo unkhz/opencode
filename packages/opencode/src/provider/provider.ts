@@ -305,7 +305,24 @@ export namespace Provider {
       const pkg = provider.npm ?? provider.id
       const mod = await import(await BunProc.install(pkg, "latest"))
       const fn = mod[Object.keys(mod).find((key) => key.startsWith("create"))!]
-      const loaded = fn(s.providers[provider.id]?.options)
+      const options = {
+        ...s.providers[provider.id]?.options,
+        fetch: (input: RequestInfo, init?: RequestInit) => {
+          let body = init?.body
+          if (typeof body === "string") {
+            try {
+              body = JSON.stringify({
+                ...JSON.parse(body),
+                stream_options: { include_usage: true },
+              })
+            } catch {
+              body = init?.body
+            }
+          }
+          return fetch(input, { ...init, body })
+        },
+      }
+      const loaded = fn(options)
       s.sdk.set(provider.id, loaded)
       return loaded as SDK
     })().catch((e) => {
